@@ -20,7 +20,7 @@ from data.pretraining_dataset import create_pretraining_dataloader
 def get_available_memory():
     if not torch.cuda.is_available():
         return 0, 0
-    total = torch.cuda.get_device_properties(0).total_mem / 1e9
+    total = torch.cuda.get_device_properties(0).total_memory / 1e9
     free = total - torch.cuda.memory_allocated(0) / 1e9
     return total, free
 
