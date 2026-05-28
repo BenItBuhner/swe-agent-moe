@@ -80,7 +80,7 @@ def main():
     print(f"  Total params: {model_config.total_params:.2f}B")
     print(f"  Activated per token: {model_config.activated_params:.2f}B")
     
-    hf_config = MoEConfig(**model_config.__dict__)
+    hf_config = model_config.to_hf_config()
     model = MoEForCausalLM(hf_config)
     
     if torch.cuda.is_available() and not use_cpu_offload:

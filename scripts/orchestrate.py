@@ -70,7 +70,9 @@ class Pipeline:
         self.state.start_time = time.time()
         self._save_state()
 
-        cmd = f"torchrun --nproc_per_node={torch.cuda.device_count() if __import__('torch').cuda.is_available() else 1} {script} {extra_args}"
+        import torch
+        nproc = torch.cuda.device_count() if torch.cuda.is_available() else 1
+        cmd = f"torchrun --nproc_per_node={nproc} {script} {extra_args}"
 
         print(f"\n{'='*60}")
         print(f"[Pipeline] Starting phase: {phase}")
