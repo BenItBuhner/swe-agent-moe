@@ -315,6 +315,16 @@ class MoEPreTrainedModel(PreTrainedModel):
                 module.bias.data.zero_()
         elif isinstance(module, nn.Embedding):
             module.weight.data.normal_(mean=0.0, std=std)
+        elif isinstance(module, Top1Router):
+            module.gate.weight.data.normal_(mean=0.0, std=std)
+        elif isinstance(module, MoELayer):
+            for expert in module.experts:
+                nn.init.normal_(expert.gate_proj.weight, std=std)
+                nn.init.normal_(expert.up_proj.weight, std=std)
+                nn.init.normal_(expert.down_proj.weight, std=std * 0.5)
+            nn.init.normal_(module.shared_expert.gate_proj.weight, std=std)
+            nn.init.normal_(module.shared_expert.up_proj.weight, std=std)
+            nn.init.normal_(module.shared_expert.down_proj.weight, std=std * 0.5)
 
 
 class MoEModel(MoEPreTrainedModel):

@@ -1,5 +1,11 @@
+"""Shared model and training configuration.
+
+MoEModelConfig is the single source of truth for architecture hyperparameters.
+TrainingConfig holds all training-phase hyperparameters and data mix definitions.
+"""
+
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 @dataclass
@@ -72,6 +78,11 @@ class MoEModelConfig:
         )
         per_layer = activated_expert + attn
         return (per_layer * self.num_hidden_layers) / 1e9
+
+    def to_hf_config(self):
+        """Convert to HuggingFace MoEConfig (model/architecture.py)."""
+        from model.architecture import MoEConfig
+        return MoEConfig(**{k: v for k, v in self.__dict__.items() if not k.startswith("_")})
 
 
 @dataclass

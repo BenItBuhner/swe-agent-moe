@@ -15,6 +15,7 @@ from datasets import load_dataset, interleave_datasets, concatenate_datasets
 from typing import Optional, Dict, List, Iterator
 import random
 import math
+import warnings
 
 
 SWE_LANGUAGES = [
@@ -22,13 +23,22 @@ SWE_LANGUAGES = [
     "C++", "Java", "C", "Shell", "Ruby", "C#",
 ]
 
+# Each source with its weight in the pretraining mix.
+# Weights are relative; they get normalized to probabilities inside __iter__.
+PRETRAIN_SOURCES = {
+    "codeparrot/github-code":       0.20,
+    "bigcode/the-stack-v2":         0.20,
+    "allenai/dolma":                0.20,
+    "cerebras/SlimPajama-627B":     0.15,
+    "HuggingFaceFW/fineweb-edu":    0.25,
+}
+
+# Some datasets expose the text column under different names.
+_TEXT_COLUMNS = ("text", "content", "code", "document")
+
 
 class PretrainingDataset(IterableDataset):
     """Multi-source pretraining corpus with weighted mixing."""
-
-    SOURCE_WEIGHTS = {
-        "HuggingFaceFW/fineweb-edu": 1.0,
-    }
 
     def __init__(
         self,
@@ -36,13 +46,15 @@ class PretrainingDataset(IterableDataset):
         seq_length: int = 4096,
         subset: float = 1.0,
         language_upsample: float = 2.0,
+        source_weights: Optional[Dict[str, float]] = None,
     ):
         self.tokenizer = tokenizer
         self.seq_length = seq_length
         self.subset = subset
         self.language_upsample = language_upsample
-        self.sources = list(self.SOURCE_WEIGHTS.keys())
-        self.weights = list(self.SOURCE_WEIGHTS.values())
+        self.source_weights = source_weights or PRETRAIN_SOURCES
+        self.sources = list(self.source_weights.keys())
+        self.weights = list(self.source_weights.values())
 
     def _tokenize(self, text: str) -> torch.Tensor:
         tokens = self.tokenizer(
@@ -54,19 +66,26 @@ class PretrainingDataset(IterableDataset):
         )
         return tokens["input_ids"][0]
 
-    def _process_example(self, example: Dict) -> Optional[Dict]:
-        text = example.get("text") or example.get("content") or example.get("code") or ""
+    def _extract_text(self, example: Dict) -> str:
+        for col in _TEXT_COLUMNS:
+            val = example.get(col)
+            if val and isinstance(val, str):
+                return val
+        return ""
+
+    def _process_example(self, example: Dict) -> Iterator[Dict]:
+        text = self._extract_text(example)
         if not text or len(text) < 50:
-            return None
+            return
 
         lang = example.get("lang") or example.get("language") or ""
         is_swe = lang in SWE_LANGUAGES or any(
-            ext in text[:500] for ext in ["def ", "class ", "import ", "fn ", "func ", "pub "]
+            kw in text[:500] for kw in ("def ", "class ", "import ", "fn ", "func ", "pub ")
         )
 
         token_ids = self._tokenize(text)
         if len(token_ids) < 10:
-            return None
+            return
 
         for i in range(0, len(token_ids) - 1, self.seq_length):
             chunk = token_ids[i : i + self.seq_length + 1]
@@ -82,20 +101,26 @@ class PretrainingDataset(IterableDataset):
     def __iter__(self):
         datasets_list = []
         effective_weights = []
-        for source, weight in zip(self.sources, self.weights):
+
+        for source, weight in self.source_weights.items():
             try:
-                ds = load_dataset(source, split="train", streaming=True)
+                ds = load_dataset(source, split="train", streaming=True, trust_remote_code=True)
                 datasets_list.append(ds)
                 effective_weights.append(weight)
             except Exception as e:
-                import warnings
-                warnings.warn(f"Could not load {source}: {e}")
+                warnings.warn(f"Could not load {source}: {e}", stacklevel=2)
                 continue
 
         if not datasets_list:
             raise RuntimeError("No datasets could be loaded for pretraining")
 
-        interleaved = interleave_datasets(datasets_list, probabilities=effective_weights, seed=42)
+        # Normalize weights so they sum to 1.0 (required by interleave_datasets)
+        total_w = sum(effective_weights)
+        effective_weights = [w / total_w for w in effective_weights]
+
+        interleaved = interleave_datasets(
+            datasets_list, probabilities=effective_weights, seed=42
+        )
 
         for example in interleaved:
             if self.subset < 1.0 and random.random() > self.subset:
