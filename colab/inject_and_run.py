@@ -91,9 +91,10 @@ async def main():
 import os, sys, subprocess, json, base64
 
 # Install minimal deps first
-deps = ["torch>=2.4.0", "transformers>=4.44.0", "accelerate>=0.33.0",
+deps = ["torch>=2.14.1", "transformers>=5.10.0", "accelerate>=1.15.0",
         "datasets>=2.20.0", "sentencepiece>=0.2.0", "protobuf>=4.25.0",
-        "einops>=0.7.0", "psutil"]
+        "einops>=0.7.0", "psutil", "pillow>=13.0.0", "aiohttp>=3.14.4",
+        "anyio>=4.14.2", "certifi>=2026.10.19", "idna>=3.15", "httpx2>=2.12.0", "httpcore2>=2.10.0"]
 for d in deps:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", d])
 print("Dependencies installed")
