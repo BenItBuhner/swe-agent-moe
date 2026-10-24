@@ -277,7 +277,7 @@ if not os.path.exists('/content/model-training-pipeline'):
 sys.path.insert(0, '/content/model-training-pipeline')
 
 print("Installing dependencies...")
-!pip install -q torch>=2.4.0 transformers>=4.44.0 accelerate>=0.33.0 datasets>=2.20.0 wandb>=0.17.0 sentencepiece>=0.2.0
+!pip install -q torch>=2.14.1 transformers>=5.10.0 accelerate>=1.15.0 datasets>=2.20.0 wandb>=0.17.0 sentencepiece>=0.2.0 pillow>=13.0.0 aiohttp>=3.14.4 anyio>=4.14.2 certifi>=2026.10.19 idna>=3.15 httpx2>=2.12.0 httpcore2>=2.10.0
 
 print("Starting pretraining...")
 os.chdir('/content/model-training-pipeline')
